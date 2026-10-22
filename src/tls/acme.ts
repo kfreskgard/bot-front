@@ -96,23 +96,31 @@ export class CertificateManager {
     });
 
     const [key, csr] = await acme.crypto.createCsr({ commonName: domain });
-    const cert = await client.auto({
-      csr,
-      email,
-      termsOfServiceAgreed: true,
-      challengePriority: ['http-01'],
-      skipChallengeVerification: true,
-      challengeCreateFn: async (_authz, challenge, keyAuthorization) => {
-        challenges.set(challenge.token, keyAuthorization);
-      },
-      challengeRemoveFn: async (_authz, challenge) => {
-        challenges.delete(challenge.token);
-      },
-    });
-
-    // Stage both files first so the window between the two renames is minimal;
-    // load() rejects a mismatched pair, which makes the next start re-obtain.
+    // Stage the key before ordering: an unwritable certDir must fail here, not after
+    // a certificate has been issued (which would count against the duplicate limit).
     const keyStaged = await this.stage('key.pem', key);
+    let cert: string;
+    try {
+      cert = await client.auto({
+        csr,
+        email,
+        termsOfServiceAgreed: true,
+        challengePriority: ['http-01'],
+        skipChallengeVerification: true,
+        challengeCreateFn: async (_authz, challenge, keyAuthorization) => {
+          challenges.set(challenge.token, keyAuthorization);
+        },
+        challengeRemoveFn: async (_authz, challenge) => {
+          challenges.delete(challenge.token);
+        },
+      });
+    } catch (err) {
+      await fs.rm(keyStaged.tmp, { force: true });
+      throw err;
+    }
+
+    // Stage the cert too before renaming either, so the window between the two renames
+    // is minimal; load() rejects a mismatched pair, which makes the next start re-obtain.
     const certStaged = await this.stage('cert.pem', cert);
     await this.commit(keyStaged);
     await this.commit(certStaged);
