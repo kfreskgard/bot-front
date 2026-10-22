@@ -14,7 +14,10 @@ import {
   setSession,
   verifyPassword,
 } from './auth';
-import { Layout } from './views/Layout';
+import { isValidDate, todayStockholm } from './day';
+import { formatTime } from './views/format';
+import { DayPage } from './views/DayPage';
+import { PositionsPanel, type PositionsPanelProps } from './views/PositionsPanel';
 import { LoginPage } from './views/LoginPage';
 
 export interface AppDeps {
@@ -95,16 +98,39 @@ export function createApp(deps: AppDeps): Hono {
     return c.redirect('/login', 302);
   });
 
-  // Placeholder until the day page replaces it.
-  app.get('/', login, (c) =>
-    c.html(
-      <Layout title="bot-front">
-        <main>
-          <h1>bot-front</h1>
-        </main>
-      </Layout>,
-    ),
-  );
+  let failingSince: Date | null = null;
+
+  async function buildPanel(date: string): Promise<PositionsPanelProps> {
+    const now = deps.now();
+    const polling = date === todayStockholm(now);
+    const result = await deps.botBack.getPositions(date);
+    if (result.ok) {
+      failingSince = null;
+      return { kind: 'data', date, polling, data: result.data, now };
+    }
+    failingSince ??= now;
+    const message =
+      result.kind === 'unreachable'
+        ? `Bot unreachable since ${formatTime(failingSince.toISOString())}`
+        : `Bot error: ${result.message}`;
+    return { kind: 'error', date, polling, message };
+  }
+
+  app.get('/', login, async (c) => {
+    const today = todayStockholm(deps.now());
+    const requested = c.req.query('date');
+    if (requested !== undefined && !isValidDate(requested)) return c.redirect('/', 302);
+    const date = requested ?? today;
+    return c.html(<DayPage date={date} today={today} panel={await buildPanel(date)} />);
+  });
+
+  app.get('/partials/positions', login, async (c) => {
+    const date = c.req.query('date');
+    if (date === undefined || !isValidDate(date)) {
+      return c.html(<PositionsPanel kind="error" date="" polling={false} message="Invalid date" />);
+    }
+    return c.html(<PositionsPanel {...await buildPanel(date)} />);
+  });
 
   return app;
 }
