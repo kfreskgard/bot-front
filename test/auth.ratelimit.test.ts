@@ -50,3 +50,40 @@ test('recordSuccess resets the count', () => {
   for (let i = 0; i < 4; i++) limiter.recordFailure('a');
   assert.equal(limiter.isLocked('a'), false);
 });
+
+test('a locked IP cannot extend its lock or restart its count', () => {
+  const { limiter, advance } = setup();
+  for (let i = 0; i < 5; i++) limiter.recordFailure('a');
+  advance(10 * MIN);
+  limiter.recordFailure('a');
+  advance(5 * MIN);
+  assert.equal(limiter.isLocked('a'), false);
+  for (let i = 0; i < 4; i++) limiter.recordFailure('a');
+  assert.equal(limiter.isLocked('a'), false);
+});
+
+test('expired state is swept so memory stays bounded', () => {
+  const { limiter, advance } = setup();
+  for (let i = 0; i < 1500; i++) limiter.recordFailure(`ip${i}`);
+  assert.equal(limiter.size, 1500);
+  advance(16 * MIN);
+  limiter.recordFailure('fresh');
+  assert.equal(limiter.size, 1);
+});
+
+test('expired locks are swept too', () => {
+  const { limiter, advance } = setup();
+  for (let i = 0; i < 1200; i++) for (let j = 0; j < 5; j++) limiter.recordFailure(`ip${i}`);
+  assert.equal(limiter.size, 1200);
+  advance(16 * MIN);
+  limiter.recordFailure('fresh');
+  assert.equal(limiter.size, 1);
+});
+
+test('hard cap drops oldest failure entries but keeps active locks', () => {
+  const { limiter } = setup();
+  for (let j = 0; j < 5; j++) limiter.recordFailure('locked');
+  for (let i = 0; i < 10_500; i++) limiter.recordFailure(`ip${i}`);
+  assert.equal(limiter.size, 10_000);
+  assert.equal(limiter.isLocked('locked'), true);
+});
