@@ -38,7 +38,37 @@ Run this from a checkout of the repository (the Docker image does not contain `s
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
+## Development
+
+The server is Hono; the pages are a React single-page app built with esbuild into `dist/web/`.
+
+```
+npm run fake-botback        # fake bot-back on :1234
+CONFIG_PATH=./config.json npm run dev
+```
+
+Use a `config.json` with `tls: false`, `httpPort: 8080` and `botBackUrl: http://localhost:1234`.
+`npm run dev` rebuilds the bundle and restarts the server on every edit; reload the page (F5) to pick
+it up. Switch the fake's response with `curl localhost:1234/_mode/<mode>`, where mode is `good`,
+`empty`, `malformed` or `error`. Stop the fake to see bot-back unreachable.
+
+Without watching: `npm run build:web`, then `CONFIG_PATH=./config.json npm start`.
+
 ## Build and run
+
+The image builds the web bundle in a first stage and copies only `dist/web` into the final image.
+
+1. Before building, check `df -h /storage`. Build only with at least 1 GB free: the build stage needs
+   the full `node_modules` (React, esbuild, TypeScript) and the new image is built next to the
+   previous one.
+2. After building, run `docker image prune -f`. It removes only dangling images (the previous
+   `kimf/bot-front` after re-tagging, and the build stage), not other unused images.
+3. If space is short, `docker images` and `docker ps -a` show what exists. Remove unused images by name
+   with `docker rmi <image>`. `docker image prune -a` also removes base images other projects build
+   from, so it is not part of the routine.
+4. To update Node, the base image is pinned by digest in the Dockerfile's `ARG NODE_IMAGE`. Pull the
+   newer `node:22-alpine` on the box, check that it starts (`docker run --rm <new digest> node -v`),
+   and replace the digest.
 
 ```
 docker build -t kimf/bot-front .
@@ -75,9 +105,6 @@ that the container log shows `[bot-front] Failed login from <ip>` with the real 
 docker-proxy hides the source address (every line shows the same internal IP), all clients share a
 single limiter bucket and five failed logins from anyone lock everyone out.
 
-Local run without Docker: `CONFIG_PATH=./config.json npm start` with `tls: false` and e.g.
-`httpPort: 8080`.
-
 ## Staging to production
 
 1. Start with `acmeStaging: true`, `tls: true`, and the router forwarding 80 and 443. A staging
@@ -88,7 +115,3 @@ Local run without Docker: `CONFIG_PATH=./config.json npm start` with `tls: false
 ## Tests
 
 `npm test` and `npm run typecheck`.
-
-## Vendored dependencies
-
-- htmx 2.0.11, from https://unpkg.com/htmx.org@2.0.11/dist/htmx.min.js (static/htmx.min.js)

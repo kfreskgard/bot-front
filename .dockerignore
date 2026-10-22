@@ -4,3 +4,6 @@ docs
 certs
 config.json
 .git
+dist
+.superpowers
+graft
