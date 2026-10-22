@@ -6,7 +6,7 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "tsx --test \"test/**/*.test.ts\"",
+    "test": "tsx --test \"test/**/*.test.ts\" \"test/**/*.test.tsx\"",
     "start": "tsx src/server.ts",
     "dev": "tsx watch src/server.ts",
     "build:web": "tsx scripts/build-web.ts",
