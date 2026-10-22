@@ -30,3 +30,39 @@ export async function verifyPassword(password: string, stored: string): Promise<
     return false;
   }
 }
+
+const MAX_FAILURES = 5;
+const WINDOW_MS = 15 * 60_000;
+const LOCK_MS = 15 * 60_000;
+
+export class LoginRateLimiter {
+  private failures = new Map<string, number[]>();
+  private lockedUntil = new Map<string, number>();
+
+  constructor(private now: () => number = Date.now) {}
+
+  isLocked(ip: string): boolean {
+    const until = this.lockedUntil.get(ip);
+    if (until === undefined) return false;
+    if (this.now() < until) return true;
+    this.lockedUntil.delete(ip);
+    return false;
+  }
+
+  recordFailure(ip: string): void {
+    const now = this.now();
+    const recent = (this.failures.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
+    recent.push(now);
+    if (recent.length >= MAX_FAILURES) {
+      this.lockedUntil.set(ip, now + LOCK_MS);
+      this.failures.delete(ip);
+    } else {
+      this.failures.set(ip, recent);
+    }
+  }
+
+  recordSuccess(ip: string): void {
+    this.failures.delete(ip);
+    this.lockedUntil.delete(ip);
+  }
+}
