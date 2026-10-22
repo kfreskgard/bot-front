@@ -1,6 +1,7 @@
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import type { Context, MiddlewareHandler } from 'hono';
+import type { ApiErrorBody } from '../shared/types';
 import { deleteCookie, getSignedCookie, setSignedCookie } from 'hono/cookie';
 
 const scryptAsync = promisify(scrypt) as (
@@ -147,7 +148,11 @@ export function clearSession(c: Context): void {
   deleteCookie(c, SESSION_COOKIE, { path: '/' });
 }
 
-export function requireLogin(secret: string, now: () => Date): MiddlewareHandler {
+export function requireLogin(
+  secret: string,
+  now: () => Date,
+  onFail: 'redirect' | 'json' = 'redirect',
+): MiddlewareHandler {
   return async (c, next) => {
     // Everything behind the login is private account data: never let a browser or proxy keep it.
     c.header('Cache-Control', 'no-store');
@@ -155,8 +160,9 @@ export function requireLogin(secret: string, now: () => Date): MiddlewareHandler
       await next();
       return;
     }
-    if (c.req.header('HX-Request') === 'true') {
-      return c.body(null, 200, { 'HX-Redirect': '/login' });
+    if (onFail === 'json') {
+      const body: ApiErrorBody = { error: { kind: 'unauthorized', message: 'Not logged in' } };
+      return c.json(body, 401);
     }
     return c.redirect('/login', 302);
   };

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createApp } from '../src/app';
 import { hashPassword, LoginRateLimiter } from '../src/auth';
 import type { BotBackClient, BotBackResult } from '../src/botback';
-import type { PositionView } from '../shared/types';
+import { POSITIONS, pos } from './helpers/positions';
 import type { Config } from '../src/config';
 
 const SECRET = Buffer.alloc(32, 7).toString('base64');
@@ -13,33 +13,6 @@ before(async () => {
 });
 
 const NOW = new Date('2026-10-22T08:42:15Z');
-
-function pos(over: Partial<PositionView>): PositionView {
-  return {
-    id: 'p', stockId: 's', stockName: 'Stock', state: 'x', status: 'open', untracked: false,
-    created: '2026-10-22T07:00:00Z', lastUpdated: '2026-10-22T07:00:00Z',
-    targetAmount: 100, bought: 100, sold: 0, orderCount: 1,
-    avgBuyPrice: 250, avgSellPrice: null, lastPrice: 254.1, lastPriceTime: '2026-10-22T08:41:30Z',
-    result: 410, resultPercent: 1.64, ...over,
-  };
-}
-
-const NOT_BOUGHT = {
-  bought: 0, avgBuyPrice: null, lastPrice: null, lastPriceTime: null, result: null, resultPercent: null,
-};
-
-const POSITIONS: PositionView[] = [
-  pos({ id: '1', stockName: 'Alpha' }),
-  pos({ id: '2', stockName: 'Beta', lastPriceTime: '2026-10-22T08:39:00Z' }),
-  pos({ id: '3', stockName: 'Gamma', result: null, resultPercent: null }),
-  pos({ id: '4', stockName: 'Delta', untracked: true }),
-  pos({ id: '5', stockName: 'Eps', status: 'pending', ...NOT_BOUGHT }),
-  pos({ id: '6', stockName: 'Zeta', status: 'notFilled', ...NOT_BOUGHT }),
-  pos({
-    id: '7', stockName: 'H&M <b>', status: 'closed', sold: 100, avgSellPrice: 260,
-    result: -1500, resultPercent: -2.5, lastPrice: null, lastPriceTime: null,
-  }),
-];
 
 function setup(opts: { now?: () => Date; results?: BotBackResult[] } = {}) {
   const calls: string[] = [];
@@ -244,12 +217,5 @@ describe('positions partial', () => {
     assert.match(html, /Invalid date/);
     assert.doesNotMatch(html, /hx-trigger/);
     assert.deepEqual(calls, []);
-  });
-
-  it('without a session answers HX-Redirect to /login', async () => {
-    const { app } = setup();
-    const res = await app.request('/partials/positions?date=2026-10-22', { headers: { 'HX-Request': 'true' } });
-    assert.equal(res.status, 200);
-    assert.equal(res.headers.get('HX-Redirect'), '/login');
   });
 });

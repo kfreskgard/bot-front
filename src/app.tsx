@@ -15,6 +15,7 @@ import {
   verifyPassword,
 } from './auth';
 import { isValidDate, todayStockholm } from '../shared/day';
+import type { ApiErrorBody } from '../shared/types';
 import { formatTime } from '../shared/format';
 import { DayPage } from './views/DayPage';
 import { PositionsPanel, type PositionsPanelProps } from './views/PositionsPanel';
@@ -98,14 +99,26 @@ export function createApp(deps: AppDeps): Hono {
     return c.redirect('/login', 302);
   });
 
+  const apiLogin = requireLogin(config.sessionSecret, deps.now, 'json');
+
   let failingSince: Date | null = null;
+
+  /** Start of the current run of bot-back failures; null while it is healthy. */
+  function trackFailure(ok: boolean, now: Date): Date | null {
+    if (ok) {
+      failingSince = null;
+      return null;
+    }
+    failingSince ??= now;
+    return failingSince;
+  }
 
   async function buildPanel(date: string): Promise<PositionsPanelProps> {
     const now = deps.now();
     const polling = date === todayStockholm(now);
     const result = await deps.botBack.getPositions(date);
+    const since = trackFailure(result.ok, now);
     if (result.ok) {
-      failingSince = null;
       const panel: PositionsPanelProps = { kind: 'data', date, polling, data: result.data, now };
       try {
         // JSX renders lazily; render now so malformed data surfaces here, not as a 500 later.
@@ -116,10 +129,9 @@ export function createApp(deps: AppDeps): Hono {
       }
       return panel;
     }
-    failingSince ??= now;
     const message =
       result.kind === 'unreachable'
-        ? `Bot unreachable since ${formatTime(failingSince.toISOString())}`
+        ? `Bot unreachable since ${formatTime((since ?? now).toISOString())}`
         : `Bot error: ${result.message}`;
     return { kind: 'error', date, polling, message };
   }
@@ -138,6 +150,22 @@ export function createApp(deps: AppDeps): Hono {
       return c.html(<PositionsPanel kind="error" date="" polling={false} message="Invalid date" />);
     }
     return c.html(<PositionsPanel {...await buildPanel(date)} />);
+  });
+
+  app.get('/api/positions', apiLogin, async (c) => {
+    const date = c.req.query('date');
+    if (date === undefined || !isValidDate(date)) {
+      const body: ApiErrorBody = { error: { kind: 'badRequest', message: 'Invalid date' } };
+      return c.json(body, 400);
+    }
+    const now = deps.now();
+    const result = await deps.botBack.getPositions(date);
+    const since = trackFailure(result.ok, now);
+    if (result.ok) return c.json(result.data);
+    const body: ApiErrorBody = {
+      error: { kind: result.kind, message: result.message, since: (since ?? now).toISOString() },
+    };
+    return c.json(body, 502);
   });
 
   return app;

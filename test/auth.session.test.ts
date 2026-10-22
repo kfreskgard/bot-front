@@ -7,7 +7,7 @@ const SECRET = Buffer.from('0123456789abcdef0123456789abcdef').toString('base64'
 const T0 = new Date('2026-10-22T10:00:00Z');
 const DAY = 86_400_000;
 
-function makeApp(secure: boolean, clock: () => Date) {
+function makeApp(secure: boolean, clock: () => Date, onFail?: 'redirect' | 'json') {
   const app = new Hono();
   app.get('/set', async (c) => {
     await setSession(c, SECRET, secure, clock());
@@ -17,7 +17,7 @@ function makeApp(secure: boolean, clock: () => Date) {
     clearSession(c);
     return c.text('cleared');
   });
-  app.use('/p', requireLogin(SECRET, clock));
+  app.use('/p', requireLogin(SECRET, clock, onFail));
   app.get('/p', (c) => c.text('page'));
   return app;
 }
@@ -81,11 +81,19 @@ test('no cookie redirects to /login', async () => {
   assert.equal(res.headers.get('location'), '/login');
 });
 
-test('no cookie with HX-Request gets HX-Redirect', async () => {
-  const res = await makeApp(true, () => T0).request('/p', { headers: { 'HX-Request': 'true' } });
-  assert.equal(res.status, 200);
-  assert.equal(res.headers.get('hx-redirect'), '/login');
-  assert.equal(await res.text(), '');
+test('json mode answers 401 JSON without a cookie', async () => {
+  const res = await makeApp(true, () => T0, 'json').request('/p');
+  assert.equal(res.status, 401);
+  assert.equal(res.headers.get('cache-control'), 'no-store');
+  assert.equal(res.headers.get('location'), null);
+  assert.deepEqual(await res.json(), { error: { kind: 'unauthorized', message: 'Not logged in' } });
+});
+
+test('redirect mode redirects even with HX-Request', async () => {
+  const res = await makeApp(true, () => T0, 'redirect').request('/p', { headers: { 'HX-Request': 'true' } });
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get('location'), '/login');
+  assert.equal(res.headers.get('hx-redirect'), null);
 });
 
 test('clearSession expires the cookie', async () => {
