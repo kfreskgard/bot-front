@@ -38,11 +38,11 @@ test('retryDelay', () => {
   assert.equal(retryDelay(10), 21_600_000);
 });
 
-function makeManager(dir: string, domain = 'bot.test') {
+function makeManager(dir: string, domain = 'bot.test', staging = true) {
   return new CertificateManager({
     domain,
     email: 'a@b.test',
-    staging: true,
+    staging,
     certDir: dir,
     challenges: new Map(),
   });
@@ -134,3 +134,20 @@ test('http app includes a non-default https port', async () => {
   const res = await app.request('http://evil.example/x?y=1', { headers: { Host: 'evil.example' } });
   assert.equal(res.headers.get('location'), 'https://bot.example.se:8443/x?y=1');
 });
+
+function withFixtureDir(prefix: string, fn: (dir: string) => Promise<void>) {
+  return async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tls-'));
+    try {
+      fs.copyFileSync(path.join(fixtures, `${prefix}-cert.pem`), path.join(dir, 'cert.pem'));
+      fs.copyFileSync(path.join(fixtures, `${prefix}-key.pem`), path.join(dir, 'key.pem'));
+      await fn(dir);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  };
+}
+
+test('load accepts a certificate without a subject common name', withFixtureDir('nocn', async (dir) => {
+  assert.ok(await makeManager(dir).load(new Date()));
+}));

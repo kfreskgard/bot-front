@@ -59,7 +59,9 @@ export class CertificateManager {
     }
     try {
       const info = acme.crypto.readCertificateInfo(cert);
-      const names = [info.domains.commonName, ...info.domains.altNames].map((n) => n.toLowerCase());
+      const names = [info.domains.commonName, ...info.domains.altNames]
+        .filter((n): n is string => typeof n === 'string')
+        .map((n) => n.toLowerCase());
       if (!names.includes(this.opts.domain.toLowerCase())) return null;
       if (now.getTime() >= info.notAfter.getTime()) return null;
       const pair = new crypto.X509Certificate(cert).checkPrivateKey(crypto.createPrivateKey(key));
