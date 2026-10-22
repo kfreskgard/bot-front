@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { PositionView } from '../src/botback';
-import { summarize, summaryText } from '../src/summary';
+import type { PositionView } from '../shared/types';
+import { summarize, summaryText } from '../shared/summary';
 
 let n = 0;
 function pos(over: Partial<PositionView>): PositionView {

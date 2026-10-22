@@ -14,8 +14,8 @@ import {
   setSession,
   verifyPassword,
 } from './auth';
-import { isValidDate, todayStockholm } from './day';
-import { formatTime } from './views/format';
+import { isValidDate, todayStockholm } from '../shared/day';
+import { formatTime } from '../shared/format';
 import { DayPage } from './views/DayPage';
 import { PositionsPanel, type PositionsPanelProps } from './views/PositionsPanel';
 import { LoginPage } from './views/LoginPage';

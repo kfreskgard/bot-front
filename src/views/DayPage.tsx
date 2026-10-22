@@ -1,4 +1,4 @@
-import { addDays } from '../day';
+import { addDays } from '../../shared/day';
 import { Layout } from './Layout';
 import { PositionsPanel, type PositionsPanelProps } from './PositionsPanel';
 

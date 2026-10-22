@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addDays, isValidDate, todayStockholm } from '../src/day';
+import { addDays, isValidDate, todayStockholm } from '../shared/day';
 
 test('todayStockholm uses the Stockholm calendar date', () => {
   assert.equal(todayStockholm(new Date('2026-10-21T22:30:00Z')), '2026-10-22');

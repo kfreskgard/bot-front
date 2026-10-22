@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatKr, formatPercent, formatPrice, formatTime, isPriceOld } from '../src/views/format';
+import { formatKr, formatPercent, formatPrice, formatTime, isPriceOld } from '../shared/format';
 
 test('formatKr', () => {
   assert.equal(formatKr(1234), '+1 234 kr');

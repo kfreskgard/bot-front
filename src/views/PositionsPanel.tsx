@@ -1,6 +1,6 @@
-import type { PositionStatus, PositionView, PositionsResponse } from '../botback';
-import { summarize, summaryText } from '../summary';
-import { formatKr, formatPercent, formatPrice, formatTime, isPriceOld } from './format';
+import type { PositionStatus, PositionView, PositionsResponse } from '../../shared/types';
+import { summarize, summaryText } from '../../shared/summary';
+import { formatKr, formatPercent, formatPrice, formatTime, isPriceOld } from '../../shared/format';
 
 export type PositionsPanelProps =
   | { kind: 'data'; date: string; polling: boolean; data: PositionsResponse; now: Date }

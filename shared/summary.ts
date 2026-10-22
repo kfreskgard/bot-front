@@ -1,5 +1,5 @@
-import type { PositionView } from './botback';
-import { formatKr } from './views/format';
+import type { PositionView } from './types';
+import { formatKr } from './format';
 
 export interface DaySummary {
   taken: number;

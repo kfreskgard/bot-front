@@ -2,7 +2,8 @@ import { before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../src/app';
 import { hashPassword, LoginRateLimiter } from '../src/auth';
-import type { BotBackClient, BotBackResult, PositionView } from '../src/botback';
+import type { BotBackClient, BotBackResult } from '../src/botback';
+import type { PositionView } from '../shared/types';
 import type { Config } from '../src/config';
 
 const SECRET = Buffer.alloc(32, 7).toString('base64');
