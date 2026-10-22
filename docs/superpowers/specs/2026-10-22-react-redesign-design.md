@@ -57,7 +57,12 @@ A throwaway build test in `node:22-alpine` on the box (2026-10-22) showed:
 esbuild is also what `tsx` already uses in bot-back on the same box. Other tools with native binaries
 (Rolldown, Tailwind v4, Lightning CSS) are avoided for the same reason.
 
-`/storage` was 92% full (527 MB free) at the time of the test, with 3.25 GB reclaimable in unused images.
+`/storage` is small (6.7 GB) and has been close to full: 527 MB free at the time of the test, 1.9 GB
+after a cleanup the same day. See "Deploying on the box" for the disk check.
+
+The tested base image is `node:22-alpine` at
+`node@sha256:ce8d97f7cfc7c5386421eb932df20a29df99b1a7f469f6157d5c9956702ffadc` (created 2026-10-21). It is
+pinned (see "Dockerfile") because newer Alpine releases can fail on Docker before 20.10 on 32-bit ARM.
 
 ## Architecture
 
@@ -73,7 +78,7 @@ One `package.json`.
 
 | Path | Contents |
 |---|---|
-| `src/` | Server. `server.ts`, `config.ts`, `tls/`, `auth.ts`, `botback.ts` unchanged. `app.tsx` becomes `app.ts` |
+| `src/` | Server. `server.ts`, `config.ts`, `tls/`, `auth.ts` unchanged. `botback.ts` gains response validation (see below). `app.tsx` becomes `app.ts` |
 | `src/pages/` | `login.ts` and `spa.ts`: the two server-rendered HTML pages, as Hono `html` tagged templates |
 | `src/manifest.ts` | Reads `dist/web/manifest.json` at startup |
 | `shared/` | Code used by both server and browser: `day.ts`, `format.ts`, `summary.ts`, `types.ts` (the `PositionView` and API error types) |
@@ -118,6 +123,29 @@ working.
   no `HX-Redirect` handling any more.
 - `Cache-Control: no-store`.
 
+### Validating bot-back's response
+
+Today a malformed bot-back response is caught when the server renders it. In the SPA, a `200` with bad
+data would replace the browser's last good data before the render fails. So `botback.ts` validates the
+response before reporting success, and a malformed response becomes `kind: "error"`,
+`"Unexpected response from bot"` (→ `502`).
+
+`validatePositionsResponse(body)` in `src/botback.ts` checks:
+
+- `date` is a `YYYY-MM-DD` string and `positions` is an array.
+- For each position:
+  - `id`, `stockId`, `stockName`, `state` are strings.
+  - `status` is one of the five `PositionStatus` values.
+  - `untracked` is a boolean.
+  - `created`, `lastUpdated` are strings that parse as dates.
+  - `targetAmount`, `bought`, `sold`, `orderCount` are finite numbers.
+  - `avgBuyPrice`, `avgSellPrice`, `lastPrice`, `result`, `resultPercent` are finite numbers or `null`.
+  - `lastPriceTime` is `null` or a string that parses as a date.
+
+Unknown extra fields are allowed and passed through. The check is hand-written, without a schema library.
+The first failing field is logged (`[bot-front] Unexpected bot data: positions[3].status`) but not
+returned to the browser.
+
 ### Security headers and CSP
 
 Unchanged: `default-src 'self'`, `base-uri 'none'`, `form-action 'self'`, `frame-ancestors 'none'`,
@@ -154,8 +182,17 @@ At this stage it holds one entry, Positions (`/positions`, Trading, `usesDate: t
 
 ### Routing
 
-About 40 lines in `web/router.ts` on the History API: current path and query, `navigate(href)`, and a
-`Link` component that intercepts clicks.
+Hand-written in `web/router.ts` on the History API: current path and query, `navigate(href)`, and a
+`Link` component. It must handle:
+
+- Back and forward: listens to `popstate` and re-renders from `location`.
+- Clicks: `Link` intercepts only plain left clicks on same-origin links. Ctrl, Cmd, Shift and Alt clicks,
+  middle clicks and links with a `target` are left to the browser. This is a pure function,
+  `shouldIntercept(event)`, so it can be tested.
+- Date changes: ◂, ▸, "Today" and the date input each push a history entry, so Back returns to the
+  previous day.
+
+Other rules:
 
 - The date is `?date=YYYY-MM-DD`. Missing means today (Stockholm). An invalid date is replaced by today
   with `history.replaceState`.
@@ -211,6 +248,18 @@ Same content as today's day page:
   - Swedish number formatting.
 - On phone: stock and result in the card header, the other fields as label and value lines.
 
+Component structure, so a render error cannot stop polling:
+
+```
+PositionsPage            owns usePositions(date), the banner and the Stale wrapper
+└─ PageErrorBoundary     resetKey = dataUpdatedAt of the query
+   └─ PositionsContent   pure: data → KPI strip + table, no hooks that fetch
+```
+
+The query hook stays mounted when `PositionsContent` throws, so polling continues. The boundary resets
+when `dataUpdatedAt` changes, that is, on the next successful fetch. Every future page follows the same
+three-level structure.
+
 ## Data flow
 
 ### Fetching
@@ -238,7 +287,7 @@ Same content as today's day page:
 | bot-back failing, no data yet | `ErrorBanner`: "Bot unreachable since HH:MM" or "Bot error: <message>" |
 | bot-back failing, data already shown | `ErrorBanner` with "… · showing data from HH:MM:SS" above the last good data wrapped in `Stale` |
 | `kind: "network"` | As the two rows above, with "Can't reach bot-front" |
-| Render error | `PageErrorBoundary` message. Polling continues and the boundary resets on the next successful fetch |
+| Render error (should not happen once the server validates) | `PageErrorBoundary` shows "Bot error: unexpected data". Polling continues and the boundary resets on the next successful fetch (see "Component structure") |
 
 ## Build and development
 
@@ -274,10 +323,13 @@ Same content as today's day page:
 
 ### Dockerfile
 
-Multi-stage, classic syntax only (Docker 19.03 without BuildKit):
+Multi-stage, classic syntax only (Docker 19.03 without BuildKit). Both stages use the pinned, tested base
+image through one `ARG` (supported before `FROM` since Docker 17.05):
 
 ```dockerfile
-FROM node:22-alpine AS build
+ARG NODE_IMAGE=node:22-alpine@sha256:ce8d97f7cfc7c5386421eb932df20a29df99b1a7f469f6157d5c9956702ffadc
+
+FROM ${NODE_IMAGE} AS build
 WORKDIR /usr/src/app
 COPY package*.json ./
 RUN npm ci
@@ -287,7 +339,7 @@ COPY shared ./shared
 COPY web ./web
 RUN npm run build:web
 
-FROM node:22-alpine
+FROM ${NODE_IMAGE}
 WORKDIR /usr/src/app
 ENV TZ=Europe/Stockholm
 COPY package*.json tsconfig.json ./
@@ -301,15 +353,37 @@ CMD ["npm", "start"]
 
 - `.dockerignore` adds `dist`, `.superpowers` and `graft`.
 - `.gitignore` adds `dist/` and `.superpowers/`.
-- README deploy steps add `docker image prune -f` after `docker build`, since the classic builder leaves
-  the build stage as an untagged image, and note that `/storage` is nearly full.
+- npm dependency versions are fixed by `package-lock.json` and `npm ci`.
+
+### Deploying on the box
+
+README additions:
+
+1. **Before building:** `df -h /storage`. Build only with at least 1 GB free. The build stage needs room
+   for the full `node_modules` (React, esbuild, TypeScript) and the final image is built next to the
+   previous one.
+2. **After building:** `docker image prune -f`. This removes only dangling images: the previous
+   `kimf/bot-front` after re-tagging and the build stage. It does not remove other unused images.
+3. **If space is short:** `docker images` and `docker ps -a` show what exists. Remove unused images by
+   name with `docker rmi <image>`. `docker image prune -a` removes every image not used by a container,
+   including base images other projects build from, so it is not part of the routine.
+4. **Updating Node:** the base image is pinned. To move to a newer `node:22-alpine`, pull it on the box,
+   check that a container starts (`docker run --rm <new digest> node -v`), and replace the digest in the
+   Dockerfile's `ARG`.
 
 ## Testing
 
 Node's built-in runner via `tsx --test`, as today. No browser and no jsdom.
 
 Moved with their modules, otherwise unchanged: `day`, `format`, `summary` tests (`summary` loses the
-text assertions). Unchanged: auth, rate limit, session, config, TLS, bot-back client tests.
+text assertions). Unchanged: auth, rate limit, session, config, TLS tests.
+
+Extended, `botback.test.ts`:
+
+- A valid response passes, including extra unknown fields.
+- Each rule in "Validating bot-back's response" has a failing case (wrong `status`, non-date `created`,
+  string where a number is expected, missing field, `NaN`/`Infinity`), and each returns
+  `kind: "error"`, `"Unexpected response from bot"`.
 
 Rewritten, `app.day.test.ts` → `app.api.test.ts`, in-process via `app.request()`:
 
@@ -327,6 +401,8 @@ New:
 
 - `pollInterval`: 15 s for today, `false` for another day, `false` once the clock passes midnight.
 - `hrefFor`: keeps `?date=` for `usesDate` pages and drops it otherwise. `/` resolves to the first page.
+- `shouldIntercept`: plain left click → true. Ctrl, Cmd, Shift, Alt, middle click, `target` set,
+  other origin → false.
 - Bottom bar split: up to 4 pages shown as is, more gives 3 plus "More".
 - Components rendered with `react-dom/server` `renderToStaticMarkup`:
   - `Money` sign classes.
@@ -337,12 +413,25 @@ New:
     an error and data: banner, "showing data from" and dimmed content.
 - Build: `build-web --outdir <temp>` produces a manifest whose files exist.
 
+Static-markup tests cannot cover interaction (navigation, polling, recovery). Browser tests were
+considered and left out; those behaviours are covered by the manual checks below.
+
 Manual checks:
 
-1. `npm run dev` on the PC. Desktop width and phone width in DevTools. Today with polling, a past day,
-   bot-back stopped and started, logout, an expired session.
-2. On the Odroid: `docker build` succeeds, run with `tls: false` on the LAN, check from a real phone,
-   then `docker image prune -f`.
+1. `npm run dev` on the PC, against a fake bot-back (a small script the plan provides, whose responses
+   can be switched between good, malformed, error and stopped). Desktop width and phone width in DevTools:
+   - Navigation: switching pages keeps the date; ◂ ▸, "Today" and the date input; back and forward
+     return to the previous dates; Ctrl-click opens a new tab.
+   - Polling: today picks up a changed response within 15 s; a past day does not poll; a hidden tab
+     stops polling and refetches on return.
+   - Errors: bot-back stopped with data on screen → dimmed data and "Bot unreachable since …", then
+     recovery when it is back; same before any data → banner only; bot-front stopped → "Can't reach
+     bot-front".
+   - Malformed bot-back data → "Bot error: Unexpected response from bot" with the last good data dimmed,
+     then recovery when good data returns.
+   - Logout; an expired or deleted session cookie → next poll goes to `/login`.
+2. On the Odroid: `df -h /storage` (at least 1 GB free), `docker build` succeeds, run with `tls: false` on
+   the LAN, check from a real phone, then `docker image prune -f`.
 3. Then the TLS rollout steps of the original spec (`2026-10-22-bot-front-design.md`), which have not
    been done on the box yet.
 
