@@ -1,0 +1,35 @@
+{
+  "name": "bot-front",
+  "version": "1.0.0",
+  "description": "Read-only web view of the trading bot's positions",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "tsx --test \"test/**/*.test.ts\"",
+    "start": "tsx src/server.ts",
+    "dev": "tsx watch src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "hash-password": "tsx scripts/hash-password.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kfreskgard/bot-front.git"
+  },
+  "keywords": [],
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/kfreskgard/bot-front/issues"
+  },
+  "homepage": "https://github.com/kfreskgard/bot-front#readme",
+  "dependencies": {
+    "@hono/node-server": "^2.1.5",
+    "acme-client": "^5.4.0",
+    "hono": "^4.13.13"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
