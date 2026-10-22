@@ -1,0 +1,11 @@
+{
+  "domain": "bot.example.se",
+  "acmeEmail": "you@example.se",
+  "acmeStaging": true,
+  "tls": true,
+  "httpPort": 80,
+  "httpsPort": 443,
+  "botBackUrl": "http://bot-back:1234",
+  "passwordHash": "scrypt$REPLACE$ME",
+  "sessionSecret": "REPLACE_WITH_32_RANDOM_BYTES_AS_BASE64"
+}
