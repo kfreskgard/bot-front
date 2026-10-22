@@ -1,0 +1,19 @@
+.data-table tr.untracked td { opacity: 0.55; }
+.data-table tr.untracked td:has(.money.neg) { opacity: 1; }
+.data-table td.old-price { opacity: 0.5; }
+
+.empty {
+  margin: 0;
+  padding: 24px 14px;
+  color: var(--muted);
+}
+
+.skeleton-kpis,
+.skeleton-table {
+  margin: var(--space-2) 14px;
+  border-radius: 4px;
+  background: var(--border);
+  opacity: 0.5;
+}
+.skeleton-kpis { height: 48px; }
+.skeleton-table { height: 240px; }
