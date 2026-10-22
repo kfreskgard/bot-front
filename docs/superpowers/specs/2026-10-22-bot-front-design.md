@@ -66,6 +66,8 @@ internet ──443/80──▶ [bot-front]  ──http (botnet only)──▶ [b
 ```
 
 - Two containers on a user-defined Docker network `botnet`, so they reach each other by name.
+  (Changed at rollout: bot-front reaches bot-back through its published port on the box's LAN address,
+  `http://192.168.68.67:1234`, so bot-back's run command stays unchanged. See the README.)
 - bot-back keeps publishing 1234 on the LAN as today. The router does not forward 1234.
 - bot-front publishes 80 and 443. The router forwards both to the box. Port 80 serves only ACME
   challenges and an https redirect.

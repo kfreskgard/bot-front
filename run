@@ -1,0 +1,9 @@
+#!/bin/bash
+# Starts the bot-front container. `./run lan` serves plain HTTP on 8081 for the LAN check (config needs "tls": false).
+if [ "$1" = "lan" ]; then
+  ports="-p 8081:80"
+else
+  ports="-p 443:443 -p 80:80"
+fi
+docker run --log-driver json-file --name bot-front --restart unless-stopped -d $ports \
+  -v /storage/bot-front-config:/config kimf/bot-front

@@ -18,7 +18,7 @@ See `config.example.json`.
 | `tls` | `false` serves plain HTTP on `httpPort` only, for LAN testing |
 | `httpPort` | HTTP port. With TLS it serves ACME challenges and the https redirect |
 | `httpsPort` | HTTPS port |
-| `botBackUrl` | bot-back base URL, e.g. `http://bot-back:1234` |
+| `botBackUrl` | bot-back base URL, e.g. `http://192.168.68.67:1234` (the box's LAN address and bot-back's published port) |
 | `passwordHash` | `scrypt$<salt>$<hash>`, from `npm run hash-password` |
 | `sessionSecret` | Base64, at least 32 random bytes |
 
@@ -70,33 +70,44 @@ The image builds the web bundle in a first stage and copies only `dist/web` into
    newer `node:22-alpine` on the box, check that it starts (`docker run --rm <new digest> node -v`),
    and replace the digest.
 
+The clone lives in `/storage/bot-front`. Config and certificates live outside it, in
+`/storage/bot-front-config/` (mounted as `/config`), so `git pull` or a fresh clone never touches them.
+bot-front reaches bot-back through bot-back's published port on the box's LAN address, so the two
+containers need no shared Docker network.
+
+`./run` starts the container (`./run lan` for the LAN check below). To redeploy, `/storage/front.sh`
+(next to bot-back's `clear.sh`) does the whole cycle:
+
 ```
+#!/bin/bash
+# Redeploys bot-front. `./front.sh lan` runs it on 8081 for the LAN check.
+set -e
+cd /storage
+free_kb=$(df -k /storage | awk 'NR==2 {print $4}')
+if [ "$free_kb" -lt 1048576 ]; then
+  echo "Less than 1 GB free on /storage, not building. See bot-front's README." >&2
+  exit 1
+fi
+docker stop bot-front 2>/dev/null || true
+docker rm bot-front 2>/dev/null || true
+cd bot-front
+git pull
 docker build -t kimf/bot-front .
-
-docker network create botnet                 # once
-# bot-back must be started with --network botnet (see its README). Do not rely on
-# `docker network connect botnet bot-back`: the connection is lost when bot-back is recreated.
-
-docker run -d --name bot-front --network botnet --restart unless-stopped \
-  -p 443:443 -p 80:80 -v /storage/bot-front:/config kimf/bot-front
+docker image prune -f
+./run "$@"
+docker logs -f bot-front
 ```
 
-Put `config.json` in `/storage/bot-front/`. The router must forward ports 80 and 443 to the box.
-
-bot-back has to run on the same network, started like this:
-
-```
-docker run --log-driver json-file -v ~/logs:/usr/src/app/logs --name bot-back --restart unless-stopped   -d --network botnet -p 1234:1234 kimf/bot-back
-```
+The router must forward ports 80 and 443 to the box.
 
 The domain must not have an AAAA record unless IPv6 is also forwarded to the box; Let's Encrypt
 prefers IPv6 when it exists and the challenge would fail.
 
 ### Checking the LAN on the box first
 
-Before opening the router, try it on the LAN: set `"tls": false` in `config.json` and run with
-`-p 8081:80` instead of `-p 443:443 -p 80:80`, then browse to `http://<box>:8081`. Switch `tls` back
-to `true` and the normal ports afterwards.
+Before opening the router, try it on the LAN: set `"tls": false` in `config.json` and run
+`./front.sh lan`, then browse to `http://<box>:8081`. Set `tls` to `true`, add `domain` and
+`acmeEmail`, and run `./front.sh` afterwards.
 
 ### Rollout check: client IPs
 
@@ -109,7 +120,7 @@ single limiter bucket and five failed logins from anyone lock everyone out.
 
 1. Start with `acmeStaging: true`, `tls: true`, and the router forwarding 80 and 443. A staging
    certificate is issued (browsers will warn about it).
-2. Stop the container and delete `/storage/bot-front/certs/`.
+2. Stop the container and delete `/storage/bot-front-config/certs/`.
 3. Set `acmeStaging: false` and start the container. A production certificate is issued.
 
 ## Tests
