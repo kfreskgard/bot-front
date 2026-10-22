@@ -158,6 +158,20 @@ describe('day page', () => {
     assert.equal(out.headers.get('cache-control'), 'no-store');
   });
 
+  it('malformed bot-back data gives the error panel, not a 500', async (t) => {
+    t.mock.method(console, 'error', () => {});
+    const bad = pos({ lastPriceTime: 'garbage' });
+    const { app } = setup({ results: [{ ok: true, data: { date: '2026-10-22', positions: [bad] } }] });
+    const cookie = await cookieFor(app);
+    for (const url of ['/', '/partials/positions?date=2026-10-22']) {
+      const res = await app.request(url, { headers: { cookie } });
+      assert.equal(res.status, 200, url);
+      const html = await res.text();
+      assert.match(html, /Bot error: unexpected data/);
+      assert.match(html, POLL);
+    }
+  });
+
   it('pending and notFilled rows show a dash as result', async () => {
     const only = [POSITIONS[4], POSITIONS[5]];
     const { app } = setup({ results: [{ ok: true, data: { date: '2026-10-22', positions: only } }] });

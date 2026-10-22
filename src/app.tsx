@@ -106,7 +106,15 @@ export function createApp(deps: AppDeps): Hono {
     const result = await deps.botBack.getPositions(date);
     if (result.ok) {
       failingSince = null;
-      return { kind: 'data', date, polling, data: result.data, now };
+      const panel: PositionsPanelProps = { kind: 'data', date, polling, data: result.data, now };
+      try {
+        // JSX renders lazily; render now so malformed data surfaces here, not as a 500 later.
+        String(<PositionsPanel {...panel} />);
+      } catch (err) {
+        console.error('[bot-front] Could not render bot-back data:', err);
+        return { kind: 'error', date, polling, message: 'Bot error: unexpected data' };
+      }
+      return panel;
     }
     failingSince ??= now;
     const message =
