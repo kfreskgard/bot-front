@@ -4,6 +4,7 @@ import { createApp, type AppDeps } from '../src/app';
 import { hashPassword, LoginRateLimiter, SESSION_COOKIE } from '../src/auth';
 import type { BotBackClient } from '../src/botback';
 import type { Config } from '../src/config';
+import { fakeWebBundle } from './helpers/web';
 
 const SECRET = Buffer.alloc(32, 7).toString('base64');
 let hash = '';
@@ -35,6 +36,7 @@ function setup(tls = true) {
   const deps: AppDeps = {
     config: makeConfig(tls),
     botBack,
+    web: fakeWebBundle(),
     limiter,
     now: () => new Date(),
     loginDelayMs: 0,
@@ -160,14 +162,14 @@ describe('app auth', () => {
 
   it('serves static files without a session', async () => {
     const { app } = setup();
-    const res = await app.request('/static/htmx.min.js');
+    const res = await app.request('/assets/main-TEST.css');
     assert.equal(res.status, 200);
-    assert.match(await res.text(), /htmx/);
+    assert.match(await res.text(), /margin/);
   });
 
   it('sets security headers on every response', async () => {
     const { app } = setup(true);
-    for (const path of ['/login', '/static/htmx.min.js', '/']) {
+    for (const path of ['/login', '/assets/main-TEST.css', '/']) {
       const res = await app.request(path);
       assert.match(res.headers.get('content-security-policy') ?? '', /default-src 'self'/, path);
       assert.equal(res.headers.get('strict-transport-security'), 'max-age=31536000', path);
@@ -184,11 +186,11 @@ describe('app auth', () => {
     assert.match(res.headers.get('content-security-policy') ?? '', /default-src 'self'/);
   });
 
-  it('login page loads htmx config meta and no inline script or style', async () => {
+  it('login page links the bundle CSS and has no script or inline style', async () => {
     const { app } = setup();
     const html = await (await app.request('/login')).text();
-    assert.match(html, /<meta name="htmx-config" content="\{&quot;includeIndicatorStyles&quot;:false\}"|<meta name="htmx-config" content='\{"includeIndicatorStyles":false\}'/);
-    assert.doesNotMatch(html, /style=|<style|\son\w+=/);
+    assert.match(html, /\/assets\/main-TEST\.css/);
+    assert.doesNotMatch(html, /<script|style=/);
   });
 
   it('starts the login page with a doctype', async () => {
@@ -242,7 +244,7 @@ describe('app auth', () => {
     t.mock.method(console, 'warn', () => {});
     const limiter = new LoginRateLimiter();
     const app = createApp({
-      config: makeConfig(true), botBack, limiter, now: () => new Date(),
+      config: makeConfig(true), botBack, web: fakeWebBundle(), limiter, now: () => new Date(),
       loginDelayMs: 50, clientIp: () => '1.2.3.4',
     });
     const results = await Promise.all(Array.from({ length: 8 }, () => app.request(loginRequest('nope'))));
@@ -255,7 +257,7 @@ describe('app auth', () => {
     t.mock.method(console, 'warn', () => {});
     const limiter = new LoginRateLimiter();
     const app = createApp({
-      config: makeConfig(true), botBack, limiter, now: () => new Date(),
+      config: makeConfig(true), botBack, web: fakeWebBundle(), limiter, now: () => new Date(),
       loginDelayMs: 50, clientIp: () => '1.2.3.4',
     });
     const batch = [

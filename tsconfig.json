@@ -4,11 +4,11 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
-    "jsxImportSource": "hono/jsx",
+    "jsxImportSource": "react",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "strict": true,
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["shared", "src", "test", "scripts"],
-  "exclude": ["web"]
+  "include": ["src", "shared", "web", "test", "scripts"]
 }

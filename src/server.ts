@@ -4,6 +4,7 @@ import { getConnInfo } from '@hono/node-server/conninfo';
 import { createApp } from './app';
 import { LoginRateLimiter } from './auth';
 import { createBotBackClient } from './botback';
+import { loadWebBundle, WebBundleError, type WebBundle } from './manifest';
 import { ConfigError, loadConfig, type Config } from './config';
 import {
   CertificateManager,
@@ -42,8 +43,20 @@ try {
   throw e;
 }
 
+let web: WebBundle;
+try {
+  web = loadWebBundle();
+} catch (e) {
+  if (e instanceof WebBundleError) {
+    console.error(e.message);
+    process.exit(1);
+  }
+  throw e;
+}
+
 const app = createApp({
   config,
+  web,
   botBack: createBotBackClient(config.botBackUrl),
   limiter: new LoginRateLimiter(),
   now: () => new Date(),

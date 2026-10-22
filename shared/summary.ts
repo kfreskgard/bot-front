@@ -1,5 +1,4 @@
 import type { PositionView } from './types';
-import { formatKr } from './format';
 
 export interface DaySummary {
   taken: number;
@@ -32,22 +31,4 @@ export function summarize(positions: PositionView[]): DaySummary {
   }
   s.total = { result: s.closed.result + s.open.result, unpriced: s.open.unpriced };
   return s;
-}
-
-const unpriced = (n: number) => (n > 0 ? ` (${n} unpriced)` : '');
-
-export function summaryText(s: DaySummary): { taken: string; attempts: string | null } {
-  const taken = [
-    s.taken === 1 ? '1 position taken' : `${s.taken} positions taken`,
-    `${s.closed.count} closed ${formatKr(s.closed.result)}`,
-    `${s.open.count} open ${formatKr(s.open.result)}${unpriced(s.open.unpriced)}`,
-    `total ${formatKr(s.total.result)}${unpriced(s.total.unpriced)}`,
-  ].join(' · ');
-  const a = s.attempts;
-  const parts = [
-    a.pending > 0 ? `${a.pending} pending` : null,
-    a.notFilled > 0 ? `${a.notFilled} not filled` : null,
-    a.noOrder > 0 ? `${a.noOrder} no order` : null,
-  ].filter((x): x is string => x !== null);
-  return { taken, attempts: parts.length ? `Attempts: ${parts.join(' · ')}` : null };
 }

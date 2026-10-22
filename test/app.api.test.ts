@@ -5,6 +5,7 @@ import { hashPassword, LoginRateLimiter } from '../src/auth';
 import type { BotBackClient, BotBackResult } from '../src/botback';
 import type { Config } from '../src/config';
 import { POSITIONS } from './helpers/positions';
+import { fakeWebBundle } from './helpers/web';
 
 const SECRET = Buffer.alloc(32, 7).toString('base64');
 let hash = '';
@@ -29,7 +30,7 @@ function setup(opts: { now?: () => Date; results?: BotBackResult[] } = {}) {
     httpPort: 80, httpsPort: 443, botBackUrl: 'http://localhost:1', passwordHash: hash, sessionSecret: SECRET,
   };
   const app = createApp({
-    config, botBack, limiter: new LoginRateLimiter(), now: opts.now ?? (() => NOW),
+    config, botBack, web: fakeWebBundle(), limiter: new LoginRateLimiter(), now: opts.now ?? (() => NOW),
     loginDelayMs: 0, clientIp: () => '1.2.3.4',
   });
   return { app, calls };
@@ -119,5 +120,72 @@ describe('GET /api/positions', () => {
     assert.equal(res.headers.get('location'), null);
     assert.deepEqual(await res.json(), { error: { kind: 'unauthorized', message: 'Not logged in' } });
     assert.deepEqual(calls, []);
+  });
+});
+
+describe('SPA and assets', () => {
+  it('serves the SPA page for any path with a session', async () => {
+    const { app } = setup();
+    const cookie = await cookieFor(app);
+    for (const url of ['/', '/positions', '/whatever?date=2026-10-22']) {
+      const res = await app.request(url, { headers: { cookie } });
+      assert.equal(res.status, 200, url);
+      assert.equal(res.headers.get('cache-control'), 'no-store', url);
+      const html = await res.text();
+      assert.ok(html.startsWith('<!doctype html>'), url);
+      assert.match(html, /\/assets\/main-TEST\.js/);
+      assert.match(html, /\/assets\/main-TEST\.css/);
+      assert.ok(html.includes('<div id="root"></div>'));
+      assert.doesNotMatch(html, /style=|<script>/);
+    }
+  });
+
+  it('redirects to /login without a session', async () => {
+    const { app } = setup();
+    const res = await app.request('/positions');
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get('location'), '/login');
+  });
+
+  it('serves known assets immutable without a session', async () => {
+    const { app } = setup();
+    const res = await app.request('/assets/main-TEST.css');
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+  });
+
+  it('404s unknown asset names strictly', async () => {
+    const { app } = setup();
+    const cookie = await cookieFor(app);
+    for (const headers of [{}, { cookie }] as Record<string, string>[]) {
+      const res = await app.request('/assets/nope.js', { headers });
+      assert.equal(res.status, 404);
+      assert.doesNotMatch(await res.text(), /<!doctype|"js"/i);
+    }
+  });
+
+  it('never serves the manifest through traversing asset paths', async () => {
+    const { app } = setup();
+    const cookie = await cookieFor(app);
+    for (const url of ['/assets/../manifest.json', '/assets/%2e%2e%2fmanifest.json', '/assets/..%2Fmanifest.json']) {
+      for (const headers of [{}, { cookie }] as Record<string, string>[]) {
+        const res = await app.request(url, { headers });
+        const body = await res.text();
+        // The URL parser may normalise these onto the SPA catch-all, so a session gets the HTML page.
+        if (res.status === 302) assert.equal(res.headers.get('location'), '/login', url);
+        else if (headers.cookie === undefined) assert.equal(res.status, 404, url);
+        else assert.ok(res.status === 404 || body.startsWith('<!doctype html>'), url);
+        assert.doesNotMatch(body, /"js"/, url);
+      }
+    }
+  });
+
+  it('404s unknown /api paths with JSON, not the SPA', async () => {
+    const { app } = setup();
+    const cookie = await cookieFor(app);
+    const res = await app.request('/api/nope', { headers: { cookie } });
+    assert.equal(res.status, 404);
+    assert.match(res.headers.get('content-type') ?? '', /application\/json/);
+    assert.deepEqual(await res.json(), { error: { kind: 'badRequest', message: 'Not found' } });
   });
 });
