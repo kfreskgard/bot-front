@@ -164,20 +164,29 @@ describe('SPA and assets', () => {
     }
   });
 
-  it('never serves the manifest through traversing asset paths', async () => {
+  it('404s encoded traversal asset paths strictly, with and without a session', async () => {
     const { app } = setup();
     const cookie = await cookieFor(app);
-    for (const url of ['/assets/../manifest.json', '/assets/%2e%2e%2fmanifest.json', '/assets/..%2Fmanifest.json']) {
+    for (const url of ['/assets/%2e%2e%2fmanifest.json', '/assets/..%2Fmanifest.json', '/assets/..%5cmanifest.json']) {
       for (const headers of [{}, { cookie }] as Record<string, string>[]) {
         const res = await app.request(url, { headers });
-        const body = await res.text();
-        // The URL parser may normalise these onto the SPA catch-all, so a session gets the HTML page.
-        if (res.status === 302) assert.equal(res.headers.get('location'), '/login', url);
-        else if (headers.cookie === undefined) assert.equal(res.status, 404, url);
-        else assert.ok(res.status === 404 || body.startsWith('<!doctype html>'), url);
-        assert.doesNotMatch(body, /"js"/, url);
+        assert.equal(res.status, 404, url);
+        assert.doesNotMatch(await res.text(), /"js"|<!doctype/i, url);
       }
     }
+  });
+
+  it('never serves the manifest for a normalised traversal path', async () => {
+    const { app } = setup();
+    const cookie = await cookieFor(app);
+    // The URL parser turns this into /manifest.json, which is the SPA catch-all.
+    const anon = await app.request('/assets/../manifest.json');
+    assert.equal(anon.status, 302);
+    assert.equal(anon.headers.get('location'), '/login');
+    const res = await app.request('/assets/../manifest.json', { headers: { cookie } });
+    const body = await res.text();
+    assert.ok(res.status === 404 || body.startsWith('<!doctype html>'));
+    assert.doesNotMatch(body, /"js"/);
   });
 
   it('404s unknown /api paths with JSON, not the SPA', async () => {
