@@ -61,6 +61,17 @@ export class LoginRateLimiter {
     return false;
   }
 
+  /**
+   * Synchronously counts a login attempt before the password is checked, so concurrent
+   * requests cannot all slip past the lockout. Returns false when the IP is locked.
+   * A successful login clears the count via recordSuccess.
+   */
+  beginAttempt(ip: string): boolean {
+    if (this.isLocked(ip)) return false;
+    this.recordFailure(ip);
+    return true;
+  }
+
   recordFailure(ip: string): void {
     if (this.isLocked(ip)) return;
     const now = this.now();

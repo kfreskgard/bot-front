@@ -1,8 +1,11 @@
+import { raw } from 'hono/html';
 import type { Child } from 'hono/jsx';
 
 export function Layout(props: { title: string; children?: Child }) {
   return (
-    <html lang="sv">
+    <>
+      {raw('<!doctype html>')}
+      <html lang="sv">
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -13,5 +16,6 @@ export function Layout(props: { title: string; children?: Child }) {
       </head>
       <body>{props.children}</body>
     </html>
+    </>
   );
 }

@@ -87,3 +87,18 @@ test('hard cap drops oldest failure entries but keeps active locks', () => {
   assert.equal(limiter.size, 10_000);
   assert.equal(limiter.isLocked('locked'), true);
 });
+
+test('beginAttempt: the 5th attempt locks and the 6th is refused', () => {
+  const { limiter } = setup();
+  for (let i = 0; i < 5; i++) assert.equal(limiter.beginAttempt('a'), true);
+  assert.equal(limiter.isLocked('a'), true);
+  assert.equal(limiter.beginAttempt('a'), false);
+});
+
+test('recordSuccess after beginAttempt clears the count', () => {
+  const { limiter } = setup();
+  for (let i = 0; i < 4; i++) limiter.beginAttempt('a');
+  limiter.recordSuccess('a');
+  for (let i = 0; i < 4; i++) assert.equal(limiter.beginAttempt('a'), true);
+  assert.equal(limiter.isLocked('a'), false);
+});
