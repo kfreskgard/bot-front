@@ -126,6 +126,31 @@ describe('app auth', () => {
     assert.equal(res.headers.get('location'), '/login');
   });
 
+  function browserLogin(headers: Record<string, string>, password = 'pw'): Request {
+    return new Request('http://localhost/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', ...headers },
+      body: new URLSearchParams({ password }),
+    });
+  }
+
+  it('accepts a same-origin form POST that carries Origin: null (Referrer-Policy: no-referrer)', async () => {
+    const { app } = setup();
+    const res = await app.request(browserLogin({ origin: 'null', 'sec-fetch-site': 'same-origin' }));
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get('location'), '/');
+  });
+
+  it('rejects Origin: null without Sec-Fetch-Site: same-origin, and does not count it', async () => {
+    const { app, limiter } = setup();
+    assert.equal((await app.request(browserLogin({ origin: 'null' }))).status, 403);
+    assert.equal(
+      (await app.request(browserLogin({ origin: 'null', 'sec-fetch-site': 'cross-site' }))).status,
+      403,
+    );
+    assert.equal(limiter.size, 0);
+  });
+
   it('GET / requires a session', async () => {
     const { app } = setup();
     const res = await app.request('/');
