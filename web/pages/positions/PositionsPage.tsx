@@ -1,8 +1,11 @@
+import { pollInterval } from '../../query.js';
+import { useReportLive } from '../../shell/live.js';
 import { PositionsView } from './PositionsView.js';
 import { usePositions } from './usePositions.js';
 
 export function PositionsPage({ date }: { date: string }) {
   const q = usePositions(date);
+  useReportLive({ polling: pollInterval(date, new Date()) !== false, updatedAt: q.dataUpdatedAt || null });
   return (
     <PositionsView
       date={date}
