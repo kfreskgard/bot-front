@@ -8,7 +8,8 @@
   "scripts": {
     "test": "tsx --test \"test/**/*.test.ts\" \"test/**/*.test.tsx\"",
     "start": "tsx src/server.ts",
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx scripts/dev.ts",
+    "fake-botback": "tsx scripts/fake-botback.ts",
     "build:web": "tsx scripts/build-web.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p web",
     "hash-password": "tsx scripts/hash-password.ts"

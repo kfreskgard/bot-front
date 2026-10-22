@@ -23,7 +23,7 @@ function writeManifest(outdir: string, metafile: esbuild.Metafile): void {
   writeFileSync(join(outdir, 'manifest.json'), JSON.stringify({ js, css }));
 }
 
-export async function buildWeb({ outdir, watch = false }: BuildWebOptions): Promise<void> {
+export async function buildWeb({ outdir, watch = false }: BuildWebOptions): Promise<() => Promise<void>> {
   outdir = resolve(outdir);
   mkdirSync(outdir, { recursive: true });
   const options = {
@@ -48,7 +48,7 @@ export async function buildWeb({ outdir, watch = false }: BuildWebOptions): Prom
   if (!watch) {
     const result = await esbuild.build(options);
     writeManifest(outdir, result.metafile);
-    return;
+    return async () => {};
   }
 
   const ctx = await esbuild.context({
@@ -65,6 +65,7 @@ export async function buildWeb({ outdir, watch = false }: BuildWebOptions): Prom
     ],
   });
   await ctx.watch();
+  return () => ctx.dispose();
 }
 
 function parseArgs(argv: string[]): BuildWebOptions {
