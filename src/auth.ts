@@ -149,6 +149,8 @@ export function clearSession(c: Context): void {
 
 export function requireLogin(secret: string, now: () => Date): MiddlewareHandler {
   return async (c, next) => {
+    // Everything behind the login is private account data: never let a browser or proxy keep it.
+    c.header('Cache-Control', 'no-store');
     if (await hasValidSession(c, secret, now())) {
       await next();
       return;

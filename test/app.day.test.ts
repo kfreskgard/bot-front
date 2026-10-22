@@ -143,6 +143,21 @@ describe('day page', () => {
     assert.doesNotMatch(html, /255,00/);
   });
 
+  it('authenticated responses are not cacheable', async () => {
+    const { app } = setup();
+    const cookie = await cookieFor(app);
+    for (const url of ['/', '/partials/positions?date=2026-10-22']) {
+      const res = await app.request(url, { headers: { cookie } });
+      assert.equal(res.status, 200);
+      assert.equal(res.headers.get('cache-control'), 'no-store', url);
+    }
+    const out = await app.request('http://localhost/logout', {
+      method: 'POST',
+      headers: { cookie, origin: 'http://localhost' },
+    });
+    assert.equal(out.headers.get('cache-control'), 'no-store');
+  });
+
   it('pending and notFilled rows show a dash as result', async () => {
     const only = [POSITIONS[4], POSITIONS[5]];
     const { app } = setup({ results: [{ ok: true, data: { date: '2026-10-22', positions: only } }] });
