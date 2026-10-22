@@ -134,6 +134,15 @@ describe('day page', () => {
     assert.match(html, /100\/100/);
   });
 
+  it('partly sold open position shows the live price, not the average sell price', async () => {
+    const partly = pos({ id: 'p1', stockName: 'Partly', bought: 40, sold: 20, avgSellPrice: 255 });
+    const { app } = setup({ results: [{ ok: true, data: { date: '2026-10-22', positions: [partly] } }] });
+    const cookie = await cookieFor(app);
+    const html = await (await app.request('/partials/positions?date=2026-10-22', { headers: { cookie } })).text();
+    assert.match(html, /data-label="Sell \/ last">254,10 · 10:41</);
+    assert.doesNotMatch(html, /255,00/);
+  });
+
   it('pending and notFilled rows show a dash as result', async () => {
     const only = [POSITIONS[4], POSITIONS[5]];
     const { app } = setup({ results: [{ ok: true, data: { date: '2026-10-22', positions: only } }] });

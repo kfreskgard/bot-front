@@ -26,9 +26,6 @@ function pollAttrs(date: string, polling: boolean): Record<string, string> {
 
 function SellCell(props: { p: PositionView; now: Date }) {
   const { p, now } = props;
-  if ((p.status === 'closed' || p.sold > 0) && p.avgSellPrice !== null) {
-    return <td data-label="Sell / last">{formatPrice(p.avgSellPrice)}</td>;
-  }
   if (p.status === 'open' && p.lastPrice !== null && p.lastPriceTime !== null) {
     const old = isPriceOld(p.lastPriceTime, now);
     return (
@@ -36,6 +33,9 @@ function SellCell(props: { p: PositionView; now: Date }) {
         {`${formatPrice(p.lastPrice)} · ${formatTime(p.lastPriceTime)}`}
       </td>
     );
+  }
+  if ((p.status === 'closed' || p.sold > 0) && p.avgSellPrice !== null) {
+    return <td data-label="Sell / last">{formatPrice(p.avgSellPrice)}</td>;
   }
   return <td data-label="Sell / last">–</td>;
 }
