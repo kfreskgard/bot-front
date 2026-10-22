@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ConfigError, loadConfig, parseConfig } from '../src/config';
@@ -11,7 +12,7 @@ const valid = () => ({
   httpPort: 80,
   httpsPort: 443,
   botBackUrl: 'http://bot-back:1234',
-  passwordHash: 'scrypt$c2FsdA==$aGFzaA==',
+  passwordHash: 'scrypt$AQEBAQEBAQEBAQEBAQEBAQ==$AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg==',
   sessionSecret: secret,
 });
 
@@ -52,6 +53,11 @@ test('missing passwordHash', () => {
 test('passwordHash must be scrypt$<b64>$<b64>', () => {
   rejects({ ...valid(), passwordHash: 'bcrypt$abc$def' }, 'passwordHash');
   rejects({ ...valid(), passwordHash: 'scrypt$abc' }, 'passwordHash');
+  const salt = Buffer.alloc(16, 1).toString('base64');
+  rejects({ ...valid(), passwordHash: 'scrypt$' + salt + '$' + Buffer.alloc(1, 2).toString('base64') }, 'passwordHash');
+  rejects({ ...valid(), passwordHash: 'scrypt$' + Buffer.alloc(8, 1).toString('base64') + '$' + Buffer.alloc(64, 2).toString('base64') }, 'passwordHash');
+  const example = JSON.parse(readFileSync(new URL('../config.example.json', import.meta.url), 'utf8'));
+  rejects({ ...example, sessionSecret: secret }, 'passwordHash');
 });
 
 test('sessionSecret must decode to at least 32 bytes', () => {

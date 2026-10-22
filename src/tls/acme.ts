@@ -39,6 +39,8 @@ export interface CertificateManagerOptions {
   challenges: Map<string, string>;
 }
 
+acme.axios.defaults.timeout = 30_000;
+
 export class CertificateManager {
   constructor(private readonly opts: CertificateManagerOptions) {}
 
@@ -94,6 +96,7 @@ export class CertificateManager {
       email,
       termsOfServiceAgreed: true,
       challengePriority: ['http-01'],
+      skipChallengeVerification: true,
       challengeCreateFn: async (_authz, challenge, keyAuthorization) => {
         challenges.set(challenge.token, keyAuthorization);
       },

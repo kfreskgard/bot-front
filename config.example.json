@@ -6,6 +6,6 @@
   "httpPort": 80,
   "httpsPort": 443,
   "botBackUrl": "http://bot-back:1234",
-  "passwordHash": "scrypt$REPLACE$ME",
+  "passwordHash": "REPLACE_WITH_OUTPUT_OF_npm_run_hash-password",
   "sessionSecret": "REPLACE_WITH_32_RANDOM_BYTES_AS_BASE64"
 }

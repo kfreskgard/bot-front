@@ -3,6 +3,13 @@ import assert from 'node:assert/strict';
 import { hashPassword, verifyPassword } from '../src/auth';
 import { parseConfig } from '../src/config';
 
+test('a 1-byte stored key never verifies', async () => {
+  const salt = Buffer.alloc(16, 1).toString('base64');
+  for (const pw of ['x', 'y', 'z']) {
+    assert.equal(await verifyPassword(pw, 'scrypt$' + salt + '$' + Buffer.alloc(1).toString('base64')), false);
+  }
+});
+
 test('round trip verifies the right password and rejects a wrong one', async () => {
   const stored = await hashPassword('hunter2');
   assert.equal(await verifyPassword('hunter2', stored), true);

@@ -30,7 +30,7 @@ With `tls: true`, certificates are kept in `/config/certs/` (override with `CERT
 npm run hash-password
 ```
 
-Type the password at the prompt and paste the printed line into `passwordHash`.
+Run this from a checkout of the repository (the Docker image does not contain `scripts/`). Type the password at the prompt and paste the printed line into `passwordHash`.
 
 ### Session secret
 

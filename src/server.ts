@@ -23,6 +23,12 @@ const log = (msg: string) => console.log(`${TAG} ${msg}`);
 const warn = (msg: string) => console.warn(`${TAG} ${msg}`);
 const error = (msg: string) => console.error(`${TAG} ${msg}`);
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+const fatalOnError = (server: { on(ev: 'error', cb: (e: NodeJS.ErrnoException) => void): unknown }, port: number) => {
+  server.on('error', (e) => {
+    error(`cannot listen on port ${port}: ${e.code ?? ''} ${e.message}`);
+    process.exit(1);
+  });
+};
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 let config: Config;
@@ -52,11 +58,15 @@ const app = createApp({
 });
 
 if (!config.tls) {
-  serve({ fetch: app.fetch, port: config.httpPort }, () => {
+  const plain = serve({ fetch: app.fetch, port: config.httpPort }, () => {
     log(`listening on http://0.0.0.0:${config.httpPort} (tls disabled)`);
   });
+  fatalOnError(plain, config.httpPort);
 } else {
-  void startWithTls(config);
+  startWithTls(config).catch((e) => {
+    console.error(`${TAG} fatal:`, e);
+    process.exit(1);
+  });
 }
 
 async function startWithTls(cfg: Config): Promise<void> {
@@ -69,9 +79,10 @@ async function startWithTls(cfg: Config): Promise<void> {
     challenges,
   });
 
-  serve({ fetch: createHttpApp(challenges, cfg.domain, cfg.httpsPort).fetch, port: cfg.httpPort }, () => {
+  const httpServer = serve({ fetch: createHttpApp(challenges, cfg.domain, cfg.httpsPort).fetch, port: cfg.httpPort }, () => {
     log(`port ${cfg.httpPort}: ACME challenges and https redirect`);
   });
+  fatalOnError(httpServer, cfg.httpPort);
   log(`domain ${cfg.domain}, Let's Encrypt ${cfg.acmeStaging ? 'STAGING' : 'production'}`);
 
   // One obtain() at a time, shared by the startup loop and the renewal timer.
@@ -85,44 +96,50 @@ async function startWithTls(cfg: Config): Promise<void> {
     return inFlight;
   };
 
-  let current = await manager.load(new Date());
-  for (let attempt = 0; current === null; attempt++) {
+  let loaded = await manager.load(new Date());
+  for (let attempt = 0; loaded === null; attempt++) {
     try {
       log('requesting a certificate');
-      current = await obtainOnce();
+      loaded = await obtainOnce();
     } catch (e) {
       const delay = retryDelay(attempt);
       error(`certificate request failed: ${message(e)}; retrying in ${Math.round(delay / 1000)} s`);
       await sleep(delay);
     }
   }
-  log(`certificate valid until ${current.notAfter.toISOString()}`);
+  const holder: { current: Certificate } = { current: loaded };
+  log(`certificate valid until ${loaded.notAfter.toISOString()}`);
 
   const server = serve(
     {
       fetch: app.fetch,
       port: cfg.httpsPort,
       createServer: https.createServer,
-      serverOptions: { key: current.key, cert: current.cert },
+      serverOptions: { key: loaded.key, cert: loaded.cert },
     },
     () => log(`listening on https port ${cfg.httpsPort}`),
   ) as unknown as https.Server;
 
-  setInterval(() => {
-    if (!shouldRenew(current!.notBefore, current!.notAfter, new Date())) return;
-    log('renewing certificate');
-    obtainOnce().then(
-      (fresh) => {
-        server.setSecureContext({ key: fresh.key, cert: fresh.cert });
-        current = fresh;
-        log(`certificate renewed, valid until ${fresh.notAfter.toISOString()}`);
-      },
-      (e) => warn(`certificate renewal failed, keeping the current one: ${message(e)}`),
-    );
-  }, RENEW_CHECK_MS);
+  fatalOnError(server, cfg.httpsPort);
+
+  const checkRenewal = async () => {
+    try {
+      const { notBefore, notAfter } = holder.current;
+      if (!shouldRenew(notBefore, notAfter, new Date())) return;
+      log('renewing certificate');
+      const fresh = await obtainOnce();
+      server.setSecureContext({ key: fresh.key, cert: fresh.cert });
+      holder.current = fresh;
+      log(`certificate renewed, valid until ${fresh.notAfter.toISOString()}`);
+    } catch (e) {
+      warn(`certificate renewal failed, keeping the current one: ${message(e)}`);
+    }
+  };
+  void checkRenewal();
+  setInterval(() => void checkRenewal(), RENEW_CHECK_MS);
 
   const checkExpiry = () => {
-    const w = expiryWarning(current!.notAfter, new Date());
+    const w = expiryWarning(holder.current.notAfter, new Date());
     if (w !== null) error(w);
   };
   checkExpiry();

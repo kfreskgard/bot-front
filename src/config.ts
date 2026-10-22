@@ -67,6 +67,9 @@ export function parseConfig(raw: unknown): Config {
   if (parts.length !== 3 || parts[0] !== 'scrypt' || !B64.test(parts[1]) || !B64.test(parts[2])) {
     fail('passwordHash', 'must have the form scrypt$<base64 salt>$<base64 hash>');
   }
+  if (Buffer.from(parts[1], 'base64').length !== 16 || Buffer.from(parts[2], 'base64').length !== 64) {
+    fail('passwordHash', 'must have a 16 byte salt and a 64 byte key; generate it with npm run hash-password');
+  }
 
   const sessionSecret = str(o, 'sessionSecret');
   if (!B64.test(sessionSecret) || Buffer.from(sessionSecret, 'base64').length < 32) {
