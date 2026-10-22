@@ -64,7 +64,10 @@ export class CertificateManager {
         .map((n) => n.toLowerCase());
       if (!names.includes(this.opts.domain.toLowerCase())) return null;
       if (now.getTime() >= info.notAfter.getTime()) return null;
-      const pair = new crypto.X509Certificate(cert).checkPrivateKey(crypto.createPrivateKey(key));
+      const x509 = new crypto.X509Certificate(cert);
+      // A staging certificate left over from a trial run must not be served in production.
+      if (!this.opts.staging && x509.issuer.includes('(STAGING)')) return null;
+      const pair = x509.checkPrivateKey(crypto.createPrivateKey(key));
       if (!pair) return null;
       return { key, cert, notBefore: info.notBefore, notAfter: info.notAfter };
     } catch {

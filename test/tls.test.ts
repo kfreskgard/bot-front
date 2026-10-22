@@ -151,3 +151,12 @@ function withFixtureDir(prefix: string, fn: (dir: string) => Promise<void>) {
 test('load accepts a certificate without a subject common name', withFixtureDir('nocn', async (dir) => {
   assert.ok(await makeManager(dir).load(new Date()));
 }));
+
+test('load rejects a staging certificate when staging is off', withFixtureDir('staging', async (dir) => {
+  assert.equal(await makeManager(dir, 'bot.test', false).load(new Date()), null);
+  assert.ok(await makeManager(dir, 'bot.test', true).load(new Date()));
+}));
+
+test('load keeps a non-staging certificate when staging is off', withDir(async (dir) => {
+  assert.ok(await makeManager(dir, 'bot.test', false).load(new Date()));
+}));
