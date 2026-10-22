@@ -105,7 +105,6 @@ td.old-price {
   opacity: 0.55;
 }
 
-tr.untracked td.positive,
 tr.untracked td.negative {
   opacity: 1;
 }

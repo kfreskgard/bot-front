@@ -44,13 +44,36 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 docker build -t kimf/bot-front .
 
 docker network create botnet                 # once
-docker network connect botnet bot-back       # once, no recreate needed
+# bot-back must be started with --network botnet (see its README). Do not rely on
+# `docker network connect botnet bot-back`: the connection is lost when bot-back is recreated.
 
 docker run -d --name bot-front --network botnet --restart unless-stopped \
   -p 443:443 -p 80:80 -v /storage/bot-front:/config kimf/bot-front
 ```
 
 Put `config.json` in `/storage/bot-front/`. The router must forward ports 80 and 443 to the box.
+
+bot-back has to run on the same network, started like this:
+
+```
+docker run --log-driver json-file -v ~/logs:/usr/src/app/logs --name bot-back --restart unless-stopped   -d --network botnet -p 1234:1234 kimf/bot-back
+```
+
+The domain must not have an AAAA record unless IPv6 is also forwarded to the box; Let's Encrypt
+prefers IPv6 when it exists and the challenge would fail.
+
+### Checking the LAN on the box first
+
+Before opening the router, try it on the LAN: set `"tls": false` in `config.json` and run with
+`-p 8081:80` instead of `-p 443:443 -p 80:80`, then browse to `http://<box>:8081`. Switch `tls` back
+to `true` and the normal ports afterwards.
+
+### Rollout check: client IPs
+
+The login rate limit is per client IP. After rollout, fail a login from outside the LAN and check
+that the container log shows `[bot-front] Failed login from <ip>` with the real external address. If
+docker-proxy hides the source address (every line shows the same internal IP), all clients share a
+single limiter bucket and five failed logins from anyone lock everyone out.
 
 Local run without Docker: `CONFIG_PATH=./config.json npm start` with `tls: false` and e.g.
 `httpPort: 8080`.

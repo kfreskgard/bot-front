@@ -5,7 +5,7 @@ export function Layout(props: { title: string; children?: Child }) {
   return (
     <>
       {raw('<!doctype html>')}
-      <html lang="sv">
+      <html lang="en">
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />

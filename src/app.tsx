@@ -87,7 +87,7 @@ export function createApp(deps: AppDeps): Hono {
       return c.redirect('/', 302);
     }
     await sleep(deps.loginDelayMs);
-    console.warn(`Failed login from ${ip}`);
+    console.warn(`[bot-front] Failed login from ${ip}`);
     return c.html(<LoginPage error="Wrong password" />, 401);
   });
 
