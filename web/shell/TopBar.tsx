@@ -1,6 +1,7 @@
 import { addDays } from '../../shared/day.js';
 import { Link } from '../router.js';
 import { hrefFor, type PageDef } from '../registry.js';
+import { DateInput } from './DateInput.js';
 import { Logout } from './Logout.js';
 
 export function TopBar({ page, date, today }: { page: PageDef | null; date: string; today: string }) {
@@ -10,7 +11,7 @@ export function TopBar({ page, date, today }: { page: PageDef | null; date: stri
       {page?.usesDate && (
         <span className="compact-date">
           <Link href={hrefFor(page, addDays(date, -1))} aria-label="Previous day">◂</Link>
-          {date.slice(5)}
+          <DateInput page={page} date={date} today={today} />
           {date < today ? (
             <Link href={hrefFor(page, addDays(date, 1))} aria-label="Next day">▸</Link>
           ) : (

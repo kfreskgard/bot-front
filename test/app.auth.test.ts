@@ -190,7 +190,7 @@ describe('app auth', () => {
     const { app } = setup();
     const html = await (await app.request('/login')).text();
     assert.match(html, /\/assets\/main-TEST\.css/);
-    assert.doesNotMatch(html, /<script|style=/);
+    assert.doesNotMatch(html, /<script|<style|style=|\son\w+=/);
   });
 
   it('starts the login page with a doctype', async () => {

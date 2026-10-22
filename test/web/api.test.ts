@@ -88,3 +88,13 @@ test('pollInterval polls only today in Stockholm', () => {
   assert.equal(pollInterval('2026-10-21', new Date('2026-10-22T08:00:00Z')), false);
   assert.equal(pollInterval('2026-10-22', new Date('2026-10-22T22:00:01Z')), false);
 });
+
+test('fetchJson drops a since that is not a date instead of rejecting the body', async () => {
+  const f = (async () => json({ error: { kind: 'unreachable', message: 'down', since: 'garbage' } }, 502)) as typeof fetch;
+  await assert.rejects(fetchJson('/api/x', { fetch: f }), (e: ApiError) => {
+    assert.equal(e.kind, 'unreachable');
+    assert.equal(e.message, 'down');
+    assert.equal(e.since, null);
+    return true;
+  });
+});

@@ -5,7 +5,11 @@ import { usePositions } from './usePositions.js';
 
 export function PositionsPage({ date }: { date: string }) {
   const q = usePositions(date);
-  useReportLive({ polling: pollInterval(date, new Date()) !== false, updatedAt: q.dataUpdatedAt || null });
+  useReportLive({
+    polling: pollInterval(date, new Date()) !== false,
+    failing: !!q.error,
+    updatedAt: q.dataUpdatedAt || null,
+  });
   return (
     <PositionsView
       date={date}

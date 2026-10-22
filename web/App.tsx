@@ -9,6 +9,7 @@ import { hrefFor, resolvePage } from './registry.js';
 import { navigate, useLocation } from './router.js';
 import { LiveProvider } from './shell/live.js';
 import { Shell } from './shell/Shell.js';
+import { RootErrorBoundary } from './ui/RootErrorBoundary.js';
 
 function useToday(): string {
   const [today, setToday] = useState(() => todayStockholm(new Date()));
@@ -34,9 +35,11 @@ export function App() {
   return (
     <QueryClientProvider client={client}>
       <LiveProvider>
-        <Shell pages={PAGES} page={page} date={date} today={today}>
-          {page ? <page.component key={page.id} date={date} /> : <NotFound />}
-        </Shell>
+        <RootErrorBoundary>
+          <Shell pages={PAGES} page={page} date={date} today={today}>
+            {page ? <page.component key={page.id} date={date} /> : <NotFound />}
+          </Shell>
+        </RootErrorBoundary>
       </LiveProvider>
     </QueryClientProvider>
   );

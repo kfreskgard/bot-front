@@ -441,5 +441,5 @@ Manual checks:
 2. `src/botback.ts` gets a typed client function, `shared/types.ts` the response type.
 3. `src/app.ts` gets a `/api/<name>` proxy route with the same error shape.
 4. `web/pages/<name>/` gets a hook and a page built from the component kit. Simulated numbers use
-   `SimValue` and `Kpi variant="sim"`.
+   `SimValue` and `Kpi variant="sim"`, and its CSS is imported from `web/main.tsx`.
 5. One entry in `web/pages.ts`.

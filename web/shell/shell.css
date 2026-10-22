@@ -53,11 +53,11 @@
   border-radius: 4px;
   font: inherit;
   padding: 2px 6px;
-  color-scheme: dark;
 }
 .disabled { opacity: 0.35; }
 .live { margin-left: auto; color: var(--pos); }
-.live.paused { color: var(--muted); }
+.live.paused, .live.pending { color: var(--muted); }
+.live.failing { color: var(--neg); }
 
 .topbar, .bottombar { display: none; }
 
@@ -73,7 +73,27 @@
     border-bottom: 1px solid var(--border);
     background: var(--bg-hover);
   }
-  .topbar .compact-date { display: flex; gap: 8px; color: var(--muted); }
+  .topbar { justify-content: flex-start; gap: var(--space-4); }
+  .topbar .compact-date { display: flex; align-items: center; color: var(--muted); }
+  .topbar .compact-date a,
+  .topbar .compact-date .disabled {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .topbar .compact-date input[type="date"] {
+    background: var(--bg-raised);
+    color: var(--fg-strong);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font: inherit;
+    font-size: 14px;
+    padding: 4px 6px;
+    min-height: 36px;
+  }
+  .topbar .logout { margin-left: auto; padding-left: var(--space-4); }
   .content > main { padding-bottom: 64px; }
   .bottombar {
     display: grid;

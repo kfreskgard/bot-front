@@ -16,16 +16,19 @@ export class ApiError extends Error {
 
 const KINDS: readonly string[] = ['badRequest', 'unauthorized', 'unreachable', 'error'];
 
+function validSince(since: unknown): string | null {
+  return typeof since === 'string' && !Number.isNaN(Date.parse(since)) ? since : null;
+}
+
 function isErrorBody(v: unknown): v is ApiErrorBody {
   if (typeof v !== 'object' || v === null) return false;
   const e = (v as { error?: unknown }).error;
   if (typeof e !== 'object' || e === null) return false;
-  const { kind, message, since } = e as Record<string, unknown>;
+  const { kind, message } = e as Record<string, unknown>;
   return (
     typeof kind === 'string' &&
     KINDS.includes(kind) &&
-    typeof message === 'string' &&
-    (since === undefined || typeof since === 'string')
+    typeof message === 'string'
   );
 }
 
@@ -58,7 +61,7 @@ export async function fetchJson<T>(
 
   if (!res.ok) {
     if (parsed && isErrorBody(body)) {
-      throw new ApiError(res.status, body.error.kind, body.error.message, body.error.since ?? null);
+      throw new ApiError(res.status, body.error.kind, body.error.message, validSince(body.error.since));
     }
     throw new ApiError(res.status, 'error', `HTTP ${res.status}`);
   }

@@ -19,6 +19,11 @@
   grid-auto-columns: 1fr;
   border-bottom: 1px solid var(--border);
 }
+@media (max-width: 699px) {
+  .kpis { grid-auto-flow: row; grid-template-columns: 1fr 1fr; }
+  .kpi { border-bottom: 1px solid var(--border); }
+  .kpi:nth-child(even) { border-right: 0; }
+}
 .kpi {
   padding: var(--space-2) 14px;
   border-right: 1px solid var(--border);
@@ -35,11 +40,13 @@
   color: var(--fg-strong);
   font-size: 15px;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 .kpi--sim .kpi-value { color: var(--sim); }
 .kpi-sub {
   color: var(--muted);
   font-size: 11px;
+  overflow-wrap: anywhere;
 }
 
 .badge {
