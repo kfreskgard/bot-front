@@ -1,0 +1,18 @@
+:root {
+  --bg: #0d1117;
+  --bg-raised: #161b22;
+  --bg-hover: #010409;
+  --border: #21262d;
+  --fg: #c9d1d9;
+  --fg-strong: #e6edf3;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --pos: #3fb950;
+  --neg: #f85149;
+  --sim: #d29922;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --font-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
