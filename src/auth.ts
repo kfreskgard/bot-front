@@ -1,5 +1,7 @@
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
+import type { Context, MiddlewareHandler } from 'hono';
+import { deleteCookie, getSignedCookie, setSignedCookie } from 'hono/cookie';
 
 const scryptAsync = promisify(scrypt) as (
   password: string,
@@ -102,4 +104,47 @@ export class LoginRateLimiter {
       this.lockedUntil.delete(oldestLock.value);
     }
   }
+}
+
+export const SESSION_COOKIE = 'session';
+export const SESSION_DAYS = 30;
+
+export async function setSession(
+  c: Context,
+  secret: string,
+  secure: boolean,
+  now: Date,
+): Promise<void> {
+  const expiry = now.getTime() + SESSION_DAYS * 86_400_000;
+  await setSignedCookie(c, SESSION_COOKIE, String(expiry), secret, {
+    httpOnly: true,
+    sameSite: 'Strict',
+    path: '/',
+    maxAge: SESSION_DAYS * 86_400,
+    secure,
+  });
+}
+
+export async function hasValidSession(c: Context, secret: string, now: Date): Promise<boolean> {
+  const value = await getSignedCookie(c, secret, SESSION_COOKIE);
+  if (!value) return false;
+  const expiry = Number(value);
+  return Number.isFinite(expiry) && expiry > now.getTime();
+}
+
+export function clearSession(c: Context): void {
+  deleteCookie(c, SESSION_COOKIE, { path: '/' });
+}
+
+export function requireLogin(secret: string, now: () => Date): MiddlewareHandler {
+  return async (c, next) => {
+    if (await hasValidSession(c, secret, now())) {
+      await next();
+      return;
+    }
+    if (c.req.header('HX-Request') === 'true') {
+      return c.body(null, 200, { 'HX-Redirect': '/login' });
+    }
+    return c.redirect('/login', 302);
+  };
 }
