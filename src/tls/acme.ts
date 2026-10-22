@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as acme from 'acme-client';
@@ -56,9 +57,11 @@ export class CertificateManager {
     }
     try {
       const info = acme.crypto.readCertificateInfo(cert);
-      const names = [info.domains.commonName, ...info.domains.altNames];
-      if (!names.includes(this.opts.domain)) return null;
+      const names = [info.domains.commonName, ...info.domains.altNames].map((n) => n.toLowerCase());
+      if (!names.includes(this.opts.domain.toLowerCase())) return null;
       if (now.getTime() >= info.notAfter.getTime()) return null;
+      const pair = new crypto.X509Certificate(cert).checkPrivateKey(crypto.createPrivateKey(key));
+      if (!pair) return null;
       return { key, cert, notBefore: info.notBefore, notAfter: info.notAfter };
     } catch {
       return null;
@@ -72,9 +75,10 @@ export class CertificateManager {
     let accountKey: Buffer;
     try {
       accountKey = await fs.readFile(this.file('account.key'));
-    } catch {
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
       accountKey = await acme.crypto.createPrivateKey();
-      await this.writeAtomic('account.key', accountKey);
+      await this.commit(await this.stage('account.key', accountKey));
     }
 
     const client = new acme.Client({
@@ -98,8 +102,12 @@ export class CertificateManager {
       },
     });
 
-    await this.writeAtomic('key.pem', key);
-    await this.writeAtomic('cert.pem', cert);
+    // Stage both files first so the window between the two renames is minimal;
+    // load() rejects a mismatched pair, which makes the next start re-obtain.
+    const keyStaged = await this.stage('key.pem', key);
+    const certStaged = await this.stage('cert.pem', cert);
+    await this.commit(keyStaged);
+    await this.commit(certStaged);
 
     const info = acme.crypto.readCertificateInfo(cert);
     return {
@@ -110,10 +118,14 @@ export class CertificateManager {
     };
   }
 
-  private async writeAtomic(name: string, data: string | Buffer): Promise<void> {
+  private async stage(name: string, data: string | Buffer): Promise<{ tmp: string; target: string }> {
     const target = this.file(name);
-    const tmp = `${target}.tmp`;
+    const tmp = `${target}.${process.pid}.${Date.now()}.tmp`;
     await fs.writeFile(tmp, data, { mode: 0o600 });
-    await fs.rename(tmp, target);
+    return { tmp, target };
+  }
+
+  private async commit(staged: { tmp: string; target: string }): Promise<void> {
+    await fs.rename(staged.tmp, staged.target);
   }
 }

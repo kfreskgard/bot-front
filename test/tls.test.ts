@@ -82,6 +82,30 @@ test('load returns null after expiry', withDir(async (dir) => {
   assert.equal(await makeManager(dir).load(new Date(c.notAfter.getTime() + DAY)), null);
 }));
 
+test('load returns null when key.pem belongs to a different key', withDir(async (dir) => {
+  fs.writeFileSync(path.join(dir, 'key.pem'), await acme.crypto.createPrivateKey());
+  assert.equal(await makeManager(dir).load(new Date()), null);
+}));
+
+test('load returns null for a garbage key.pem', withDir(async (dir) => {
+  fs.writeFileSync(path.join(dir, 'key.pem'), 'garbage');
+  assert.equal(await makeManager(dir).load(new Date()), null);
+}));
+
+test('load returns null for an unparseable cert.pem', withDir(async (dir) => {
+  fs.writeFileSync(path.join(dir, 'cert.pem'), 'garbage');
+  assert.equal(await makeManager(dir).load(new Date()), null);
+}));
+
+test('load matches the domain case-insensitively', withDir(async (dir) => {
+  assert.ok(await makeManager(dir, 'BOT.test').load(new Date()));
+}));
+
+test('obtain rethrows account.key read errors other than ENOENT', withDir(async (dir) => {
+  fs.mkdirSync(path.join(dir, 'account.key'));
+  await assert.rejects(makeManager(dir).obtain(), (e: NodeJS.ErrnoException) => e.code === 'EISDIR');
+}, false));
+
 test('load returns null for an empty directory', withDir(async (dir) => {
   assert.equal(await makeManager(dir).load(new Date()), null);
 }, false));
@@ -98,7 +122,7 @@ test('http app serves ACME challenges', async () => {
 
 test('http app redirects to https without trusting Host', async () => {
   const app = createHttpApp(new Map(), 'bot.example.se', 443);
-  const res = await app.request('/x?y=1', { headers: { Host: 'evil.example' } });
+  const res = await app.request('http://evil.example/x?y=1', { headers: { Host: 'evil.example' } });
   assert.equal(res.status, 301);
   assert.equal(res.headers.get('location'), 'https://bot.example.se/x?y=1');
   const post = await app.request('/x', { method: 'POST' });
@@ -107,6 +131,6 @@ test('http app redirects to https without trusting Host', async () => {
 
 test('http app includes a non-default https port', async () => {
   const app = createHttpApp(new Map(), 'bot.example.se', 8443);
-  const res = await app.request('/x?y=1', { headers: { Host: 'evil.example' } });
+  const res = await app.request('http://evil.example/x?y=1', { headers: { Host: 'evil.example' } });
   assert.equal(res.headers.get('location'), 'https://bot.example.se:8443/x?y=1');
 });
