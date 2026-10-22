@@ -82,6 +82,7 @@ containers need no shared Docker network.
 #!/bin/bash
 # Redeploys bot-front. `./front.sh lan` runs it on 8081 for the LAN check.
 set -e
+export PATH="/opt/bin:$PATH"   # git comes from Entware, missing in non-interactive shells
 cd /storage
 free_kb=$(df -k /storage | awk 'NR==2 {print $4}')
 if [ "$free_kb" -lt 1048576 ]; then
