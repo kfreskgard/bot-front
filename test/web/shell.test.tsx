@@ -7,7 +7,7 @@ import { PAGES } from '../../web/pages.js';
 import type { PageDef } from '../../web/registry.js';
 import { BottomBar } from '../../web/shell/BottomBar.js';
 import { DateBar } from '../../web/shell/DateBar.js';
-import { commitDate } from '../../web/shell/DateInput.js';
+import { changeCommit, commitDate } from '../../web/shell/DateInput.js';
 import { TopBar } from '../../web/shell/TopBar.js';
 import { LiveProvider, type LiveStatus } from '../../web/shell/live.js';
 import { Shell } from '../../web/shell/Shell.js';
@@ -112,6 +112,13 @@ test('top bar on a past day links to the next day', () => {
   assert.match(h, /href="\/positions\?date=2026-10-21"/);
   assert.match(h, /value="2026-10-20"/);
   assert.doesNotMatch(h, /aria-disabled/);
+});
+
+test('changeCommit commits picker selections at once and leaves typed values for blur or Enter', () => {
+  assert.equal(changeCommit('2026-10-20', today, today, false), '2026-10-20');
+  assert.equal(changeCommit('2026-10-20', today, today, true), null);
+  assert.equal(changeCommit('', today, today, false), null);
+  assert.equal(changeCommit('2026-10-23', today, today, false), null);
 });
 
 test('commitDate accepts only a different valid date not after today', () => {
